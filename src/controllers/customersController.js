@@ -81,5 +81,45 @@ export async function postCustomers(req, res) {
 }
 
 export async function putCustomers(req, res) {
-  res.sendStatus(500);
+  const id = parseInt(req.params.id);
+  const customer = req.body;
+
+  const customerSchema = joi.object({
+    name: joi.string().required(),
+    phone: joi
+      .string()
+      .pattern(/^[0-9]+$/)
+      .min(10)
+      .max(11)
+      .required(),
+    cpf: joi
+      .string()
+      .pattern(/^[0-9]+$/)
+      .max(11)
+      .min(11)
+      .required(),
+    birthday: joi.date().required(),
+  });
+
+  const { error } = customerSchema.validate(customer);
+  if (error) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const { rows: checkCpf } = await connection.query(
+    "SELECT * FROM customers WHERE cpf = $1",
+    [customer.cpf]
+  );
+  console.log(checkCpf);
+  if (checkCpf.length > 0) {
+    res.sendStatus(409);
+    return;
+  }
+
+  await connection.query(
+    "UPDATE customers SET name=$1, phone=$2, cpf=$3, birthday=$4 WHERE id=$5",
+    [customer.name, customer.phone, customer.cpf, customer.birthday, id]
+  );
+  res.sendStatus(200);
 }
