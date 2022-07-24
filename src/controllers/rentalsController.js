@@ -1,4 +1,5 @@
 import { connection } from "../dbStrategy/postgres.js";
+import dayjs from "dayjs";
 
 export async function getRentals(req, res) {
   const customerId = parseInt(req.query.customerId);
@@ -39,7 +40,67 @@ export async function getRentals(req, res) {
 }
 
 export async function postRentals(req, res) {
-  res.sendStatus(500);
+  const { customerId, gameId, daysRented } = req.body;
+
+  const { rows: checkCustomer } = await connection.query(
+    "SELECT * FROM customers WHERE id = $1",
+    [customerId]
+  );
+  if (checkCustomer.length < 1) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const { rows: checkGame } = await connection.query(
+    "SELECT * FROM games WHERE id = $1",
+    [gameId]
+  );
+  if (checkGame.length < 1) {
+    res.sendStatus(400);
+    return;
+  }
+
+  if (daysRented < 1) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const { rows: checkRentals } = await connection.query(
+    'SELECT * FROM rentals WHERE rentals."gameId" = $1',
+    [gameId]
+  );
+  if (checkRentals.length >= checkGame[0].stockTotal) {
+    res.sendStatus(400);
+    return;
+  }
+  console.log(checkRentals.length, checkGame[0].stockTotal);
+
+  const returnDate = null;
+  const delayFee = null;
+  const rentDate = dayjs(new Date(), "YYYY-MM-DD");
+
+  const { rows: gamePrice } = await connection.query(
+    'SELECT games."pricePerDay" FROM games WHERE games.id = $1',
+    [gameId]
+  );
+  console.log(gamePrice);
+  const originalPrice = gamePrice[0].pricePerDay * daysRented;
+  console.log(originalPrice);
+
+  await connection.query(
+    'INSERT INTO rentals ("customerId","gameId","rentDate","daysRented", "returnDate", "originalPrice", "delayFee") VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [
+      customerId,
+      gameId,
+      rentDate,
+      daysRented,
+      returnDate,
+      originalPrice,
+      delayFee,
+    ]
+  );
+
+  res.sendStatus(201);
 }
 
 export async function deleteRentals(req, res) {
