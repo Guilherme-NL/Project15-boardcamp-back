@@ -1,5 +1,6 @@
 import { connection } from "../dbStrategy/postgres.js";
 import dayjs from "dayjs";
+import joi from "joi";
 
 export async function getRentals(req, res) {
   const customerId = parseInt(req.query.customerId);
@@ -103,6 +104,62 @@ export async function postRentals(req, res) {
   res.sendStatus(201);
 }
 
+export async function postRentalsReturn(req, res) {
+  const id = parseInt(req.params.id);
+
+  const { rows: rental } = await connection.query(
+    "SELECT * FROM rentals WHERE id = $1",
+    [id]
+  );
+  if (rental.length < 1) {
+    res.sendStatus(404);
+    return;
+  }
+
+  if (rental[0].returnDate !== null) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const rentDate = new Date(rental[0].rentDate);
+  const returnDate = dayjs(new Date(), "YYYY-MM-DD");
+  const daysRented = rental[0].daysRented;
+  const pricePerDay = rental[0].originalPrice / rental[0].daysRented;
+  const diff = Math.abs(returnDate - rentDate);
+  const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  const delayDays = diffDays - daysRented;
+  let delayFee = null;
+
+  if (delayDays > 0) {
+    delayFee = delayDays * pricePerDay;
+  }
+
+  connection.query(
+    'UPDATE rentals SET "returnDate"= $1, "delayFee"= $2 WHERE id= $3',
+    [returnDate, delayFee, id]
+  );
+
+  res.sendStatus(200);
+}
+
 export async function deleteRentals(req, res) {
-  res.sendStatus(500);
+  const id = parseInt(req.params.id);
+
+  const { rows: rental } = await connection.query(
+    "SELECT * FROM rentals WHERE id = $1",
+    [id]
+  );
+  if (rental.length < 1) {
+    res.sendStatus(404);
+    return;
+  }
+
+  if (rental[0].returnDate === null) {
+    res.sendStatus(400);
+    return;
+  }
+
+  await connection.query("DELETE FROM rentals WHERE id = $1", [id]);
+
+  res.sendStatus(200);
 }
