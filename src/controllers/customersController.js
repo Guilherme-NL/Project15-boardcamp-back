@@ -2,7 +2,9 @@ import { connection } from "../dbStrategy/postgres.js";
 import joi from "joi";
 
 export async function getCustomers(req, res) {
-  const cpf = parseInt(req.params.cpf);
+  const cpf = parseInt(req.query.cpf);
+  const id = parseInt(req.params.id);
+  console.log(id);
 
   try {
     if (cpf) {
@@ -11,29 +13,30 @@ export async function getCustomers(req, res) {
         [cpf + "%"]
       );
       res.send(cpfCustomers);
-    } else {
-      const { rows: customers } = await connection.query(
-        "SELECT * FROM customers"
-      );
-      res.send(customers);
+      return;
     }
+    if (id) {
+      const { rows: idCustomers } = await connection.query(
+        "SELECT * FROM customers WHERE id = $1",
+        [id]
+      );
+
+      if (!idCustomers) {
+        res.sendStatus(404);
+        return;
+      }
+
+      res.send(idCustomers);
+      return;
+    }
+
+    const { rows: customers } = await connection.query(
+      "SELECT * FROM customers"
+    );
+    res.send(customers);
   } catch {
     res.sendStatus(404);
   }
-}
-
-export async function getCustomersById(req, res) {
-  const id = parseInt(req.params.id);
-
-  if (id) {
-    const { rows: idCustomers } = await connection.query(
-      "SELECT * FROM customers WHERE id = $1",
-      [id]
-    );
-    res.send(idCustomers);
-  }
-
-  res.sendStatus(404);
 }
 
 export async function postCustomers(req, res) {
